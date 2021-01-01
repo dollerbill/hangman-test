@@ -1,48 +1,72 @@
 require 'http'
 
 class Hangman
-  ALPHABET = %w[e a r i o t n s l c u d p m h g b f y w k v x z j q].freeze
   BASE_URL = 'https://prime-trust-hangperson-prod.herokuapp.com'.freeze
+  VOWELS = %w[e a i o u].freeze
+  CONSONANTS = %w[r t n s l c d p m h g b f y w k v x z j q].freeze
 
-  attr_accessor :active, :email, :game_id, :guesses, :letters, :token
+  attr_accessor :active, :email, :game_id, :guesses, :letters, :token, :words
 
   def initialize(email)
     @active = true
     @email = email
     @guesses = 0
     @letters = []
+    @words = JSON.parse(File.read('app/dictionary.json'))
   end
 
   def login
     url = "#{BASE_URL}/players?email=#{email}"
-    res = HTTP.send(:post, url)
-    raise StandardError, "#{res.status}: #{JSON.parse(res)}" if error?(res)
+    response = HTTP.send(:post, url)
+    res = JSON.parse(response)
+    check_errors(response, res)
 
-    @token = JSON.parse(res)['token']
+    @token = res['token']
   end
 
   def start_game
     url = "#{BASE_URL}/games?token=#{token}"
-    res = HTTP.send(:post, url)
-    raise StandardError, "#{res.status}: #{JSON.parse(res)}" if error?(res)
+    response = HTTP.send(:post, url)
+    res = JSON.parse(response)
+    check_errors(response, res)
 
-    @game_id = JSON.parse(res)['game']
+    @game_id = res['game']
   end
 
   def make_guess
-    letter = (ALPHABET - letters).first
+    letter = pick_letter(pick_random)
     url = "#{BASE_URL}/games/#{game_id}/guesses?token=#{token}&letter=#{letter}"
-    res = HTTP.send(:post, url)
+    response = HTTP.send(:post, url)
+    res = JSON.parse(response)
 
-    raise StandardError, "#{res.status}: #{JSON.parse(res)}" if error?(res)
-
-    @letters = JSON.parse(res)['guesses']
-    @guesses += 1
-    @active = false if JSON.parse(res)['message']
-    JSON.parse(res)
+    check_errors(response, res)
+    @words = words.reject { |w| w.include?(letter) } unless res['correct']
+    update_game(res)
+    res
   end
 
-  def error?(response)
-    response.status != 200
+  private
+
+  def check_errors(response, json)
+    raise StandardError, "#{response.status}: #{json}" if response.status != 200
+
+    true
+  end
+
+  def pick_letter(letter)
+    return letter if words.include?(letter)
+
+    VOWELS - [letter] && CONSONANTS - [letter]
+    pick_letter(pick_random)
+  end
+
+  def pick_random
+    ([VOWELS, CONSONANTS].sample - letters).first
+  end
+
+  def update_game(response)
+    @letters = response['guesses']
+    @guesses += 1
+    @active = false if response['message']
   end
 end
