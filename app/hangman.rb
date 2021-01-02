@@ -40,7 +40,8 @@ class Hangman
     res = JSON.parse(response)
 
     check_errors(response, res)
-    @words = words.reject { |w| w.include?(letter) } unless res['correct']
+
+    update_words(res, letter)
     update_game(res)
     res
   end
@@ -61,12 +62,21 @@ class Hangman
   end
 
   def pick_random
-    ([VOWELS, CONSONANTS].sample - letters).first
+    ([VOWELS, CONSONANTS].sample - letters || VOWELS - letters || CONSONANTS - letters).first
   end
 
   def update_game(response)
     @letters = response['guesses']
     @guesses += 1
     @active = false if response['message']
+  end
+
+  def update_words(response, letter)
+    concurrent = response['progress']&.split('_')&.select { |p| p.length > 1 }
+
+    @words.tap do |w|
+      w.reject { |wr| wr.include?(letter) } unless response['correct']
+      concurrent&.each { |c| w.select { |wr| wr.match?(c) } }
+    end
   end
 end
