@@ -2,7 +2,7 @@ require 'http'
 require 'pry'
 
 class Hangman
-  BASE_URL = 'https://prime-trust-hangperson-prod.herokuapp.com'.freeze
+  BASE_URL = ''.freeze
   VOWELS = %w[e a i o u].freeze
   CONSONANTS = %w[r t n s l c d p m h g b f y w k v x z j q].freeze
 
